@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A-Frame Space Planets</title>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script>
+      AFRAME.registerComponent("starfield", {
+        init: function () {
+          var group = document.createElement("a-entity");
+          for (var i = 0; i < 500; i += 1) {
+            var star = document.createElement("a-sphere");
+            var radius = 100;
+            var phi = Math.random() * Math.PI * 2;
+            var costheta = Math.random() * 2 - 1;
+            var theta = Math.acos(costheta);
+            var x = radius * Math.sin(theta) * Math.cos(phi);
+            var y = radius * Math.sin(theta) * Math.sin(phi);
+            var z = radius * Math.cos(theta);
+
+            star.setAttribute("position", x + " " + y + " " + z);
+            star.setAttribute("radius", 0.06 + Math.random() * 0.06);
+            star.setAttribute("color", "#93c5fd");
+            star.setAttribute("material", "shader: flat; emissive: #ffffff; emissiveIntensity: 1;");
+            group.appendChild(star);
+          }
+          this.el.appendChild(group);
+        },
+      });
+
+      AFRAME.registerComponent("sucked-into-blackhole", {
+        schema: {
+          speed: { type: "number", default: 0.55 },
+          minY: { type: "number", default: -5.0 },
+          maxY: { type: "number", default: 7.2 },
+          baseRadius: { type: "number", default: 4.0 },
+          baseAngle: { type: "number", default: 0 },
+          baseScale: { type: "number", default: 0.5 },
+          spiralTwist: { type: "number", default: 60.0 }
+        },
+        init: function () {
+          this.pos = this.el.object3D.position;
+          this.scale = this.el.object3D.scale;
+          this.y = this.pos.y;
+        },
+        tick: function (time, delta) {
+          var dt = (delta || 16) / 1000;
+          this.y += this.data.speed * dt;
+          if (this.y > this.data.maxY) {
+            this.y = this.data.minY;
+          }
+
+          var t = (this.y - this.data.minY) / (this.data.maxY - this.data.minY);
+          t = Math.max(0, Math.min(1, t));
+
+          // Inward funnel convergence toward the black hole singularity
+          var rFactor = Math.max(0, 1.0 - Math.pow(t, 1.7));
+          var currentR = this.data.baseRadius * rFactor;
+
+          // Spiral vortex angle
+          var currentAngle = this.data.baseAngle + (this.data.spiralTwist * Math.pow(t, 2.0));
+          var rad = currentAngle * (Math.PI / 180);
+
+          this.pos.x = currentR * Math.sin(rad);
+          this.pos.z = -currentR * Math.cos(rad);
+          this.pos.y = this.y;
+
+          // Scale shrinks into 0 as it enters the event horizon
+          var sFactor = Math.max(0.001, 1.0 - Math.pow(t, 2.2));
+          var currentScale = this.data.baseScale * sFactor;
+          this.scale.set(currentScale, currentScale, currentScale);
+
+          // Face inward toward the singularity with a gentle floating tilt
+          this.el.object3D.rotation.y = -rad;
+          this.el.object3D.rotation.x = Math.sin(time * 0.002 + this.data.baseAngle) * 0.12;
+          this.el.object3D.rotation.z = Math.cos(time * 0.002 + this.data.baseAngle) * 0.08;
+        }
+      });
+    </script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0f1f38;
+      }
+    </style>
+    <script>
+      window.addEventListener("DOMContentLoaded", function () {
+        if (window.location.protocol === "file:") {
+          var banner = document.createElement("div");
+          banner.id = "file-warning-banner";
+          banner.style.cssText =
+            "position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 99999; " +
+            "background: rgba(15, 23, 42, 0.95); border: 1px solid #f59e0b; color: #f8fafc; " +
+            "padding: 14px 20px; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; " +
+            "font-size: 14px; line-height: 1.6; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-width: 90%; text-align: center;";
+          banner.innerHTML =
+            "⚠️ <strong>Local Browser Security Restriction (CORS):</strong><br/>" +
+            "Browsers block loading 3D GLB models when opened directly via <code>file://</code>.<br/>" +
+            "Please run a local server in this directory: <code>python3 -m http.server</code><br/>" +
+            "Then open: <a href='http://localhost:8000' style='color:#38bdf8; text-decoration: underline;'>http://localhost:8000</a>";
+          document.body.appendChild(banner);
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <a-scene background="color: #0f1f38">
+      <a-assets>
+        <a-asset-item id="model-3d" src="3D.glb"></a-asset-item>
+      </a-assets>
+
+      <a-entity starfield></a-entity>
+
+      <a-entity light="type: ambient; color: #ffffff; intensity: 0.95"></a-entity>
+      <a-entity
+        light="type: directional; color: #ffffff; intensity: 1.2"
+        position="3 6 4"
+      ></a-entity>
+      <a-entity
+        light="type: point; color: #60a5fa; intensity: 0.8; distance: 50"
+        position="-3 2 -2"
+      ></a-entity>
+
+      <a-entity id="camera-rig" position="0 1.6 0">
+        <a-camera position="0 0 0"></a-camera>
+
+        <!-- Black Hole Singularity & Accretion Disk at the Top -->
+        <a-entity id="black-hole" position="0 7.2 0">
+          <!-- Pitch Black Event Horizon Core -->
+          <a-sphere
+            radius="1.2"
+            material="shader: flat; color: #000000;"
+          ></a-sphere>
+
+          <!-- Inner Fiery Cyan-White Accretion Ring -->
+          <a-ring
+            radius-inner="1.25"
+            radius-outer="2.2"
+            rotation="90 0 0"
+            material="shader: flat; color: #38bdf8; side: double; transparent: true; opacity: 0.9;"
+            animation="property: rotation; from: 90 0 0; to: 90 360 0; loop: true; dur: 2500; easing: linear;"
+          ></a-ring>
+
+          <!-- Mid Accretion Disk (Cosmic Violet / Magenta) -->
+          <a-ring
+            radius-inner="2.15"
+            radius-outer="3.6"
+            rotation="90 0 0"
+            material="shader: flat; color: #c084fc; side: double; transparent: true; opacity: 0.75;"
+            animation="property: rotation; from: 90 360 0; to: 90 0 0; loop: true; dur: 4500; easing: linear;"
+          ></a-ring>
+
+          <!-- Outer Accretion Glow Ring (Fiery Amber / Gold) -->
+          <a-ring
+            radius-inner="3.5"
+            radius-outer="5.2"
+            rotation="90 0 0"
+            material="shader: flat; color: #f59e0b; side: double; transparent: true; opacity: 0.55;"
+            animation="property: rotation; from: 90 0 0; to: 90 360 0; loop: true; dur: 7000; easing: linear;"
+          ></a-ring>
+
+          <!-- Gravitational Lensing Arc (Interstellar Style Tilted Warp Ring) -->
+          <a-ring
+            radius-inner="1.3"
+            radius-outer="2.8"
+            rotation="65 45 0"
+            material="shader: flat; color: #e0e7ff; side: double; transparent: true; opacity: 0.65;"
+            animation="property: rotation; from: 65 45 0; to: 65 405 0; loop: true; dur: 6000; easing: linear;"
+          ></a-ring>
+
+          <!-- Singularity Glow Light -->
+          <a-entity
+            light="type: point; color: #c084fc; intensity: 2.8; distance: 25"
+            position="0 -0.5 0"
+          ></a-entity>
+        </a-entity>
+
+        <!-- 50 3D Models rising from below and being funneled/sucked into the Black Hole -->
+        <!-- Model #1 (Ring 1, Angle 0.0°) -->
+        <a-entity
+          position="0.00 -2.43 -2.80"
+          sucked-into-blackhole="speed: 0.55; minY: -5.0; maxY: 7.2; baseRadius: 2.80; baseAngle: 0.0; baseScale: 0.37; spiralTwist: 85.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.37 0.37 0.37"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #2 (Ring 1, Angle 45.0°) -->
+        <a-entity
+          position="2.24 -0.06 -2.24"
+          sucked-into-blackhole="speed: 0.62; minY: -5.0; maxY: 7.2; baseRadius: 3.17; baseAngle: 45.0; baseScale: 0.42; spiralTwist: 93.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.42 0.42 0.42"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #3 (Ring 1, Angle 90.0°) -->
+        <a-entity
+          position="2.94 2.31 -0.00"
+          sucked-into-blackhole="speed: 0.69; minY: -5.0; maxY: 7.2; baseRadius: 2.94; baseAngle: 90.0; baseScale: 0.47; spiralTwist: 101.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.47 0.47 0.47"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #4 (Ring 1, Angle 135.0°) -->
+        <a-entity
+          position="2.34 4.68 2.34"
+          sucked-into-blackhole="speed: 0.76; minY: -5.0; maxY: 7.2; baseRadius: 3.31; baseAngle: 135.0; baseScale: 0.52; spiralTwist: 85.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.52 0.52 0.52"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #5 (Ring 1, Angle 180.0°) -->
+        <a-entity
+          position="0.00 -4.45 3.08"
+          sucked-into-blackhole="speed: 0.51; minY: -5.0; maxY: 7.2; baseRadius: 3.08; baseAngle: 180.0; baseScale: 0.33; spiralTwist: 93.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.33 0.33 0.33"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #6 (Ring 1, Angle 225.0°) -->
+        <a-entity
+          position="-2.02 -2.08 2.02"
+          sucked-into-blackhole="speed: 0.58; minY: -5.0; maxY: 7.2; baseRadius: 2.85; baseAngle: 225.0; baseScale: 0.38; spiralTwist: 101.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.38 0.38 0.38"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #7 (Ring 1, Angle 270.0°) -->
+        <a-entity
+          position="-3.22 0.29 0.00"
+          sucked-into-blackhole="speed: 0.65; minY: -5.0; maxY: 7.2; baseRadius: 3.22; baseAngle: 270.0; baseScale: 0.43; spiralTwist: 85.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.43 0.43 0.43"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #8 (Ring 1, Angle 315.0°) -->
+        <a-entity
+          position="-2.12 2.66 -2.12"
+          sucked-into-blackhole="speed: 0.72; minY: -5.0; maxY: 7.2; baseRadius: 3.00; baseAngle: 315.0; baseScale: 0.48; spiralTwist: 93.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.48 0.48 0.48"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #9 (Ring 2, Angle 18.0°) -->
+        <a-entity
+          position="1.17 5.03 -3.61"
+          sucked-into-blackhole="speed: 0.79; minY: -5.0; maxY: 7.2; baseRadius: 3.80; baseAngle: 18.0; baseScale: 0.53; spiralTwist: 75.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.53 0.53 0.53"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #10 (Ring 2, Angle 54.0°) -->
+        <a-entity
+          position="3.37 -4.10 -2.45"
+          sucked-into-blackhole="speed: 0.54; minY: -5.0; maxY: 7.2; baseRadius: 4.17; baseAngle: 54.0; baseScale: 0.34; spiralTwist: 83.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.34 0.34 0.34"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #11 (Ring 2, Angle 90.0°) -->
+        <a-entity
+          position="3.94 -1.73 -0.00"
+          sucked-into-blackhole="speed: 0.61; minY: -5.0; maxY: 7.2; baseRadius: 3.94; baseAngle: 90.0; baseScale: 0.39; spiralTwist: 91.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.39 0.39 0.39"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #12 (Ring 2, Angle 126.0°) -->
+        <a-entity
+          position="3.49 0.64 2.53"
+          sucked-into-blackhole="speed: 0.68; minY: -5.0; maxY: 7.2; baseRadius: 4.31; baseAngle: 126.0; baseScale: 0.44; spiralTwist: 75.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.44 0.44 0.44"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #13 (Ring 2, Angle 162.0°) -->
+        <a-entity
+          position="1.26 3.01 3.88"
+          sucked-into-blackhole="speed: 0.75; minY: -5.0; maxY: 7.2; baseRadius: 4.08; baseAngle: 162.0; baseScale: 0.49; spiralTwist: 83.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.49 0.49 0.49"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #14 (Ring 2, Angle 198.0°) -->
+        <a-entity
+          position="-1.19 5.38 3.67"
+          sucked-into-blackhole="speed: 0.5; minY: -5.0; maxY: 7.2; baseRadius: 3.85; baseAngle: 198.0; baseScale: 0.54; spiralTwist: 91.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.54 0.54 0.54"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #15 (Ring 2, Angle 234.0°) -->
+        <a-entity
+          position="-3.42 -3.75 2.48"
+          sucked-into-blackhole="speed: 0.57; minY: -5.0; maxY: 7.2; baseRadius: 4.22; baseAngle: 234.0; baseScale: 0.35; spiralTwist: 75.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.35 0.35 0.35"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #16 (Ring 2, Angle 270.0°) -->
+        <a-entity
+          position="-4.00 -1.38 0.00"
+          sucked-into-blackhole="speed: 0.64; minY: -5.0; maxY: 7.2; baseRadius: 4.00; baseAngle: 270.0; baseScale: 0.4; spiralTwist: 83.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.4 0.4 0.4"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #17 (Ring 2, Angle 306.0°) -->
+        <a-entity
+          position="-3.53 0.99 -2.57"
+          sucked-into-blackhole="speed: 0.71; minY: -5.0; maxY: 7.2; baseRadius: 4.37; baseAngle: 306.0; baseScale: 0.45; spiralTwist: 91.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.45 0.45 0.45"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #18 (Ring 2, Angle 342.0°) -->
+        <a-entity
+          position="-1.28 3.36 -3.93"
+          sucked-into-blackhole="speed: 0.78; minY: -5.0; maxY: 7.2; baseRadius: 4.14; baseAngle: 342.0; baseScale: 0.5; spiralTwist: 75.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.5 0.5 0.5"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #19 (Ring 3, Angle 9.0°) -->
+        <a-entity
+          position="0.75 5.73 -4.74"
+          sucked-into-blackhole="speed: 0.53; minY: -5.0; maxY: 7.2; baseRadius: 4.80; baseAngle: 9.0; baseScale: 0.55; spiralTwist: 65.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.55 0.55 0.55"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #20 (Ring 3, Angle 39.0°) -->
+        <a-entity
+          position="3.25 -3.40 -4.02"
+          sucked-into-blackhole="speed: 0.6; minY: -5.0; maxY: 7.2; baseRadius: 5.17; baseAngle: 39.0; baseScale: 0.36; spiralTwist: 73.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.36 0.36 0.36"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #21 (Ring 3, Angle 69.0°) -->
+        <a-entity
+          position="4.61 -1.03 -1.77"
+          sucked-into-blackhole="speed: 0.67; minY: -5.0; maxY: 7.2; baseRadius: 4.94; baseAngle: 69.0; baseScale: 0.41; spiralTwist: 81.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.41 0.41 0.41"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #22 (Ring 3, Angle 99.0°) -->
+        <a-entity
+          position="5.25 1.34 0.83"
+          sucked-into-blackhole="speed: 0.74; minY: -5.0; maxY: 7.2; baseRadius: 5.31; baseAngle: 99.0; baseScale: 0.46; spiralTwist: 65.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.46 0.46 0.46"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #23 (Ring 3, Angle 129.0°) -->
+        <a-entity
+          position="3.95 3.71 3.20"
+          sucked-into-blackhole="speed: 0.49; minY: -5.0; maxY: 7.2; baseRadius: 5.08; baseAngle: 129.0; baseScale: 0.51; spiralTwist: 73.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.51 0.51 0.51"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #24 (Ring 3, Angle 159.0°) -->
+        <a-entity
+          position="1.74 6.08 4.53"
+          sucked-into-blackhole="speed: 0.56; minY: -5.0; maxY: 7.2; baseRadius: 4.85; baseAngle: 159.0; baseScale: 0.32; spiralTwist: 81.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.32 0.32 0.32"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #25 (Ring 3, Angle 189.0°) -->
+        <a-entity
+          position="-0.82 -3.05 5.16"
+          sucked-into-blackhole="speed: 0.63; minY: -5.0; maxY: 7.2; baseRadius: 5.22; baseAngle: 189.0; baseScale: 0.37; spiralTwist: 65.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.37 0.37 0.37"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #26 (Ring 3, Angle 219.0°) -->
+        <a-entity
+          position="-3.14 -0.68 3.88"
+          sucked-into-blackhole="speed: 0.7; minY: -5.0; maxY: 7.2; baseRadius: 5.00; baseAngle: 219.0; baseScale: 0.42; spiralTwist: 73.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.42 0.42 0.42"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #27 (Ring 3, Angle 249.0°) -->
+        <a-entity
+          position="-5.01 1.69 1.92"
+          sucked-into-blackhole="speed: 0.77; minY: -5.0; maxY: 7.2; baseRadius: 5.37; baseAngle: 249.0; baseScale: 0.47; spiralTwist: 81.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.47 0.47 0.47"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #28 (Ring 3, Angle 279.0°) -->
+        <a-entity
+          position="-5.07 4.06 -0.80"
+          sucked-into-blackhole="speed: 0.52; minY: -5.0; maxY: 7.2; baseRadius: 5.14; baseAngle: 279.0; baseScale: 0.52; spiralTwist: 65.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.52 0.52 0.52"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #29 (Ring 3, Angle 309.0°) -->
+        <a-entity
+          position="-3.81 6.43 -3.09"
+          sucked-into-blackhole="speed: 0.59; minY: -5.0; maxY: 7.2; baseRadius: 4.91; baseAngle: 309.0; baseScale: 0.33; spiralTwist: 73.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.33 0.33 0.33"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #30 (Ring 3, Angle 339.0°) -->
+        <a-entity
+          position="-1.89 -2.70 -4.93"
+          sucked-into-blackhole="speed: 0.66; minY: -5.0; maxY: 7.2; baseRadius: 5.28; baseAngle: 339.0; baseScale: 0.38; spiralTwist: 81.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.38 0.38 0.38"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #31 (Ring 4, Angle 27.0°) -->
+        <a-entity
+          position="2.63 -0.33 -5.17"
+          sucked-into-blackhole="speed: 0.73; minY: -5.0; maxY: 7.2; baseRadius: 5.80; baseAngle: 27.0; baseScale: 0.43; spiralTwist: 55.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.43 0.43 0.43"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #32 (Ring 4, Angle 63.0°) -->
+        <a-entity
+          position="5.61 2.04 -2.86"
+          sucked-into-blackhole="speed: 0.48; minY: -5.0; maxY: 7.2; baseRadius: 6.29; baseAngle: 63.0; baseScale: 0.48; spiralTwist: 63.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.48 0.48 0.48"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #33 (Ring 4, Angle 99.0°) -->
+        <a-entity
+          position="5.92 4.41 0.94"
+          sucked-into-blackhole="speed: 0.55; minY: -5.0; maxY: 7.2; baseRadius: 5.99; baseAngle: 99.0; baseScale: 0.53; spiralTwist: 71.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.53 0.53 0.53"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #34 (Ring 4, Angle 135.0°) -->
+        <a-entity
+          position="4.58 -4.72 4.58"
+          sucked-into-blackhole="speed: 0.62; minY: -5.0; maxY: 7.2; baseRadius: 6.48; baseAngle: 135.0; baseScale: 0.34; spiralTwist: 55.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.34 0.34 0.34"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #35 (Ring 4, Angle 171.0°) -->
+        <a-entity
+          position="0.97 -2.35 6.10"
+          sucked-into-blackhole="speed: 0.69; minY: -5.0; maxY: 7.2; baseRadius: 6.18; baseAngle: 171.0; baseScale: 0.39; spiralTwist: 63.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.39 0.39 0.39"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #36 (Ring 4, Angle 207.0°) -->
+        <a-entity
+          position="-2.67 0.02 5.23"
+          sucked-into-blackhole="speed: 0.76; minY: -5.0; maxY: 7.2; baseRadius: 5.87; baseAngle: 207.0; baseScale: 0.44; spiralTwist: 71.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.44 0.44 0.44"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #37 (Ring 4, Angle 243.0°) -->
+        <a-entity
+          position="-5.67 2.39 2.89"
+          sucked-into-blackhole="speed: 0.51; minY: -5.0; maxY: 7.2; baseRadius: 6.37; baseAngle: 243.0; baseScale: 0.49; spiralTwist: 55.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.49 0.49 0.49"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #38 (Ring 4, Angle 279.0°) -->
+        <a-entity
+          position="-5.99 4.76 -0.95"
+          sucked-into-blackhole="speed: 0.58; minY: -5.0; maxY: 7.2; baseRadius: 6.06; baseAngle: 279.0; baseScale: 0.54; spiralTwist: 63.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.54 0.54 0.54"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #39 (Ring 4, Angle 315.0°) -->
+        <a-entity
+          position="-4.64 -4.37 -4.64"
+          sucked-into-blackhole="speed: 0.65; minY: -5.0; maxY: 7.2; baseRadius: 6.56; baseAngle: 315.0; baseScale: 0.35; spiralTwist: 71.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.35 0.35 0.35"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #40 (Ring 4, Angle 351.0°) -->
+        <a-entity
+          position="-0.98 -2.00 -6.17"
+          sucked-into-blackhole="speed: 0.72; minY: -5.0; maxY: 7.2; baseRadius: 6.25; baseAngle: 351.0; baseScale: 0.4; spiralTwist: 55.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.4 0.4 0.4"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #41 (Ring 5, Angle 12.0°) -->
+        <a-entity
+          position="1.46 0.37 -6.85"
+          sucked-into-blackhole="speed: 0.79; minY: -5.0; maxY: 7.2; baseRadius: 7.00; baseAngle: 12.0; baseScale: 0.45; spiralTwist: 45.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.45 0.45 0.45"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #42 (Ring 5, Angle 48.0°) -->
+        <a-entity
+          position="5.75 2.74 -5.18"
+          sucked-into-blackhole="speed: 0.54; minY: -5.0; maxY: 7.2; baseRadius: 7.74; baseAngle: 48.0; baseScale: 0.5; spiralTwist: 53.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.5 0.5 0.5"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #43 (Ring 5, Angle 84.0°) -->
+        <a-entity
+          position="7.24 5.11 -0.76"
+          sucked-into-blackhole="speed: 0.61; minY: -5.0; maxY: 7.2; baseRadius: 7.28; baseAngle: 84.0; baseScale: 0.55; spiralTwist: 61.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.55 0.55 0.55"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #44 (Ring 5, Angle 120.0°) -->
+        <a-entity
+          position="6.95 -4.02 4.01"
+          sucked-into-blackhole="speed: 0.68; minY: -5.0; maxY: 7.2; baseRadius: 8.02; baseAngle: 120.0; baseScale: 0.36; spiralTwist: 45.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.36 0.36 0.36"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #45 (Ring 5, Angle 156.0°) -->
+        <a-entity
+          position="3.08 -1.65 6.91"
+          sucked-into-blackhole="speed: 0.75; minY: -5.0; maxY: 7.2; baseRadius: 7.57; baseAngle: 156.0; baseScale: 0.41; spiralTwist: 53.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.41 0.41 0.41"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #46 (Ring 5, Angle 192.0°) -->
+        <a-entity
+          position="-1.48 0.72 6.95"
+          sucked-into-blackhole="speed: 0.5; minY: -5.0; maxY: 7.2; baseRadius: 7.11; baseAngle: 192.0; baseScale: 0.46; spiralTwist: 61.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.46 0.46 0.46"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #47 (Ring 5, Angle 228.0°) -->
+        <a-entity
+          position="-5.83 3.09 5.25"
+          sucked-into-blackhole="speed: 0.57; minY: -5.0; maxY: 7.2; baseRadius: 7.85; baseAngle: 228.0; baseScale: 0.51; spiralTwist: 45.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.51 0.51 0.51"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #48 (Ring 5, Angle 264.0°) -->
+        <a-entity
+          position="-7.35 5.46 0.77"
+          sucked-into-blackhole="speed: 0.64; minY: -5.0; maxY: 7.2; baseRadius: 7.39; baseAngle: 264.0; baseScale: 0.32; spiralTwist: 53.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.32 0.32 0.32"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #49 (Ring 5, Angle 300.0°) -->
+        <a-entity
+          position="-7.04 -3.67 -4.07"
+          sucked-into-blackhole="speed: 0.71; minY: -5.0; maxY: 7.2; baseRadius: 8.13; baseAngle: 300.0; baseScale: 0.37; spiralTwist: 61.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.37 0.37 0.37"></a-gltf-model>
+        </a-entity>
+
+        <!-- Model #50 (Ring 5, Angle 336.0°) -->
+        <a-entity
+          position="-3.12 -1.30 -7.01"
+          sucked-into-blackhole="speed: 0.78; minY: -5.0; maxY: 7.2; baseRadius: 7.67; baseAngle: 336.0; baseScale: 0.42; spiralTwist: 45.0;"
+        >
+          <a-gltf-model src="#model-3d" scale="0.42 0.42 0.42"></a-gltf-model>
+        </a-entity>
+      </a-entity>
+    </a-scene>
+  </body>
+</html>
